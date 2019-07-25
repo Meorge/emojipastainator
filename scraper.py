@@ -3,31 +3,50 @@ import praw
 import emoji
 from string import punctuation
 import json
+import sys
+from nltk.stem import *
 
-global big_emoji_list
+global big_emoji_list, stemmer
 
 
 # from Curtis Lusmore on Quora https://www.quora.com/How-do-I-remove-punctuation-from-a-Python-string
 def strip_punctuation(s):
     return ''.join(c for c in s if c not in punctuation)
 
+# from emile on stackoverflow https://stackoverflow.com/questions/4391697/find-the-index-of-a-dict-within-a-list-by-matching-the-dicts-value
+def find(lst, key, value):
+    for i, dic in enumerate(lst):
+        if dic[key] == value:
+            return i
+    return -1
+
 def add_emoji_to_dict(word, emj):
-    global big_emoji_list
+    global big_emoji_list, stemmer
 
     word = strip_punctuation(word.lower())
+
+    word = stemmer.stem(word)
+
     emj = emoji.demojize(emj)
     print("Adding an emoji {} for the word {}".format(emj, word))
     for i in big_emoji_list:
         print("{} vs {}".format(emj, i["emoji"]))
-        if i["emoji"] == emj: print("SAME EMOJI")
 
-        if i["emoji"] == emj and word not in i["meanings"]:
-            i["meanings"].append(word)
+        # need to find if i["meanings"] contains a dictionary where key "word" has value of word
+        wordExists = False
+        for g in i["meanings"]:
+            if g["word"] == word:
+                wordExists = True
+                break
+        
+        if i["emoji"] == emj and not wordExists:
+            i["meanings"].append({"word": word, "freq": 1})
             return
-        elif i["emoji"] == emj and word in i["meanings"]:
+        elif i["emoji"] == emj and wordExists:
+            i["meanings"][find(i["meanings"], "word", word)]["freq"] += 1
             return
 
-    big_emoji_list.append({"emoji": emj, "meanings": [word]})
+    big_emoji_list.append({"emoji": emj, "meanings": [{"word": word, "freq": 1}]})
 
 
 big_emoji_list = []
@@ -39,6 +58,8 @@ emoji_list_format = [
         "rad"
     ]}
 ]
+
+stemmer = PorterStemmer()
 
 with open("reddit_secret", "r") as sec:
     secret = sec.read()
@@ -67,7 +88,7 @@ for post in reddit.subreddit('emojipasta').search('self:yes', sort="top", time_f
 
     count += 1
 
-    if count > 50:
+    if count > 200:#int(sys.argv[1]) if len(sys.argv) < 2 and sys.argv[1].isdigit() else 50:
         break
     print('\n')
 
